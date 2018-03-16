@@ -1,3 +1,3 @@
-# Pattern
+# Shirt Pattern Generator
 
-A tool to generate a shirt pattern from measurements.
+A [shirt pattern generator](https://arthursw.github.io/ShirtPatternGenerator/).
