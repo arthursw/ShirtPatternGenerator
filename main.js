@@ -40,7 +40,7 @@ let applyRecursively = (item, functionToApply)=> {
 	}
 }
 
-let saveReferenceShapes = ()=> {
+let saveReferenceShapesToLocalStorage = ()=> {
 	let referenceShapesJSON = []
 	for(let referenceShape of referenceShapes) {
 		referenceShapesJSON.push({ shapes: referenceShape.shapes.exportJSON(), values: referenceShape.values })
@@ -48,7 +48,7 @@ let saveReferenceShapes = ()=> {
 	localStorage.setItem('referenceShapes', JSON.stringify(referenceShapesJSON))
 }
 
-let loadReferenceShapes = ()=> {
+let loadReferenceShapesFromLocalStorage = ()=> {
 	let referenceShapesJSON = JSON.parse(localStorage.getItem('referenceShapes')) || []
 	referenceShapes = []
 	for(let referenceShapeJSON of referenceShapesJSON) {
@@ -110,6 +110,25 @@ let debugParameters = {
 	parrotScaleX: 0.85,
 	parrotScaleY: 0.85,
 	createReferenceShape: ()=> {
+		// check if there is a reference with those values, if so delete it
+		for(let i=0 ; i<referenceShapes.length ; i++) {
+			let referenceShape = referenceShapes[i]
+			let allValuesAreEqual = true
+			for(let valueName in referenceShape.values) {
+				if( referenceShape.values[valueName] != null && parameters[valueName] != null && Number.isFinite( referenceShape.values[valueName] ) && Number.isFinite( parameters[valueName] ) ) {
+					if(referenceShape.values[valueName] != parameters[valueName]) {
+						allValuesAreEqual = false
+						break
+					}
+				}
+			}
+			if(allValuesAreEqual) {
+				referenceShapes[i].shapes.remove()
+				referenceShapes.splice(i, 1)
+				break
+			}
+		}
+
 		let clone = shapes.clone()
 		referenceShapeGroup.addChild(clone)
 
@@ -126,7 +145,7 @@ let debugParameters = {
 		
 		let referenceShape = {shapes: clone, values: parametersCopy }
 		referenceShapes.push(referenceShape)
-		saveReferenceShapes()
+		saveReferenceShapesToLocalStorage()
 	},
 	setToReferenceShape: ()=> {
 		let index = referenceShapes.findIndex((s)=> selectedShape == s.shapes)
@@ -145,7 +164,15 @@ let debugParameters = {
 		}
 		referenceShapes[index].shapes.remove()
 		referenceShapes.splice(index, 1)
-		saveReferenceShapes()
+		saveReferenceShapesToLocalStorage()
+	},
+	loadReferenceShapesFromLocalStorage: ()=> {
+		
+	},
+	saveReferenceShapesToLocalStorage: ()=> {
+		let json = JSON.stringify(referenceShapes)
+		let blob = new Blob([json], {type: "application/json"})
+		saveAs(blob, "références.json")
 	}
 }
 
@@ -163,9 +190,9 @@ let referenceShapes = null
 let referenceShapeDistanceThreshold = 2
 
 function drawShapes(drawHelpers) {
-	if(shapes == selectedShape) {
-		selectedShape = null
-	}
+
+	let reselectShapes = shapes != null && selectedShape == shapes
+	
 	if(group != null) {
 		group.remove()
 	}
@@ -175,6 +202,9 @@ function drawShapes(drawHelpers) {
 	}
 
 	group = new paper.Group()
+	
+	let helperGroup = new paper.Group()
+	group.addChild(helperGroup)
 
 	// Back
 
@@ -238,7 +268,7 @@ function drawShapes(drawHelpers) {
 
 		let backShapeHelper = backShape.clone()
 		backShapeHelper.strokeColor = 'green'
-		group.addChild(backShapeHelper)
+		helperGroup.addChild(backShapeHelper)
 
 		let jhPath = new paper.Path()
 		jhPath.add(J)
@@ -247,7 +277,7 @@ function drawShapes(drawHelpers) {
 		jhPath.strokeWidth = 1
 		jhPath.strokeScaling = false
 		jhPath.strokeColor = 'green'
-		group.addChild(jhPath)
+		helperGroup.addChild(jhPath)
 
 		let bPath = new paper.Path()
 		bPath.add(B)
@@ -255,7 +285,7 @@ function drawShapes(drawHelpers) {
 		bPath.strokeWidth = 1
 		bPath.strokeScaling = false
 		bPath.strokeColor = 'green'
-		group.addChild(bPath)
+		helperGroup.addChild(bPath)
 
 		let dPath = new paper.Path()
 		dPath.add(Ax, Dy)
@@ -264,7 +294,7 @@ function drawShapes(drawHelpers) {
 		dPath.strokeWidth = 1
 		dPath.strokeScaling = false
 		dPath.strokeColor = 'green'
-		group.addChild(dPath)
+		helperGroup.addChild(dPath)
 
 		let cPath = new paper.Path()
 		cPath.add(Ax, Cy)
@@ -272,7 +302,7 @@ function drawShapes(drawHelpers) {
 		cPath.strokeWidth = 1
 		cPath.strokeScaling = false
 		cPath.strokeColor = 'green'
-		group.addChild(cPath)
+		helperGroup.addChild(cPath)
 	}
 
 
@@ -326,7 +356,7 @@ function drawShapes(drawHelpers) {
 		
 		let frontShapeHelper = frontShape.clone()
 		frontShapeHelper.strokeColor = 'green'
-		group.addChild(frontShapeHelper)
+		helperGroup.addChild(frontShapeHelper)
 
 		let tenPath = new paper.Path()
 		tenPath.add(Ten)
@@ -334,7 +364,7 @@ function drawShapes(drawHelpers) {
 		tenPath.strokeWidth = 1
 		tenPath.strokeScaling = false
 		tenPath.strokeColor = 'green'
-		group.addChild(tenPath)
+		helperGroup.addChild(tenPath)
 		
 		let twoPath = new paper.Path()
 		twoPath.add(FiveX, By)
@@ -345,7 +375,7 @@ function drawShapes(drawHelpers) {
 		twoPath.strokeWidth = 1
 		twoPath.strokeScaling = false
 		twoPath.strokeColor = 'green'
-		group.addChild(twoPath)
+		helperGroup.addChild(twoPath)
 		
 		let thirteenPath = new paper.Path()
 		thirteenPath.add(Ten)
@@ -353,7 +383,7 @@ function drawShapes(drawHelpers) {
 		thirteenPath.strokeWidth = 1
 		thirteenPath.strokeScaling = false
 		thirteenPath.strokeColor = 'green'
-		group.addChild(thirteenPath)
+		helperGroup.addChild(thirteenPath)
 
 		let threePath = new paper.Path()
 		threePath.add(0, Dy)
@@ -362,7 +392,7 @@ function drawShapes(drawHelpers) {
 		threePath.strokeWidth = 1
 		threePath.strokeScaling = false
 		threePath.strokeColor = 'green'
-		group.addChild(threePath)
+		helperGroup.addChild(threePath)
 
 		let fourPath = new paper.Path()
 		fourPath.add(0, Cy)
@@ -370,28 +400,21 @@ function drawShapes(drawHelpers) {
 		fourPath.strokeWidth = 1
 		fourPath.strokeScaling = false
 		fourPath.strokeColor = 'green'
-		group.addChild(fourPath)
+		helperGroup.addChild(fourPath)
 	}
 
-
-	if(selectedShape == null) {
+	if(reselectShapes) {
 		selectedShape = shapes
 		for(let child of shapes.children) {
 			child.fullySelected = true
 		}
 	}
 
-	group.scale(10)
-
 	for(let rs of referenceShapes) {
 		rs.shapes.position = shapes.position
 	}
 
-	interpolateBetweenReferenceShapes()
-
 	// Enlargement
-
-	group.scale(0.1)
 
 	let enlargementGroup = new paper.Group()
 	group.addChild(enlargementGroup)
@@ -401,10 +424,7 @@ function drawShapes(drawHelpers) {
 	sSix.point.x += 4
 	sSix.point.y += 2.5
 	sEleven.point.x += -0.5
-	let TwelveOffset = sTwelve.location.offset
-	let TwelveFurther = frontShape.getPointAt(TwelveOffset + 1)
-	let TwelveTangent = Twelve.subtract(TwelveFurther).normalize()
-	sTwelve.point = sTwelve.point.add(Twelve.subtract(Eleven).normalize().multiply(2)).add(TwelveTangent.multiply(0.5))
+	sTwelve.point = sTwelve.point.add(0, -0.5).add(Twelve.subtract(Eleven).normalize().multiply(2))
 	sFive.point.x += 4
 	sFive.point.y = By + 78
 	sOne.point.y = By + 78
@@ -413,14 +433,6 @@ function drawShapes(drawHelpers) {
 	sixPath.add(sSix.point.clone())
 	sixPath.add(sSix.point.add(-6, 0))
 	enlargementGroup.addChild(sixPath)
-
-	let ElevenB = frontShape.getPointAt(sEleven.location.offset - 2.5)
-	let TwelveB = frontShape.getPointAt(sTwelve.location.offset + 3.5)
-	
-	let ElevenBPath = new paper.Path()
-	ElevenBPath.add(ElevenB)
-	ElevenBPath.add(TwelveB)
-	enlargementGroup.addChild(ElevenBPath)
 
 	let v1 = new paper.Path()
 	v1.add(Eight.add(-1.5, 0))
@@ -453,10 +465,7 @@ function drawShapes(drawHelpers) {
 
 	sE.point.x += -4
 	sE.point.y += 2.5
-	let kOffset = sK.location.offset
-	let Kfurther = backShape.getPointAt(kOffset + 1)
-	let kTangent = K.subtract(Kfurther).normalize()
-	sK.point = sK.point.add(K.subtract(J).normalize().multiply(2)).add(kTangent.multiply(0.5))
+	sK.point = sK.point.add(0, -0.5).add(K.subtract(J).normalize().multiply(2))
 	sJ.point = backShape.getPointAt(sJ.location.offset - 2)
 	sK.point = sJ.point.add(sK.point.subtract(sJ.point).normalize().multiply(shoulderLengthFront))
 	sF.point.x += -4
@@ -469,27 +478,6 @@ function drawShapes(drawHelpers) {
 	enlargementGroup.addChild(ePath)
 
 	let B1 = B.add(0, 6.5)
-	let bPath = new paper.Path()
-	bPath.add(B1)
-	bPath.add(sF.point.x, B1.y)
-	enlargementGroup.addChild(bPath)
-
-	let bPathIntersections = bPath.getIntersections(backShape)
-	let minX = Number.MAX_VALUE
-	let K2 = null
-	for(let intersection of bPathIntersections) {
-		if(intersection.point.x < minX) {
-			minX = intersection.point.x
-			K2 = intersection.point
-		}
-	}
-
-	bPath.lastSegment.point.x = K2.x
-
-	let bPath2 = new paper.Path()
-	bPath2.add(new paper.Segment(K2.add(6, 0), null, new paper.Point(-4, 0) ))
-	bPath2.add(K2.x, K2.y + 1)
-	enlargementGroup.addChild(bPath2)
 
 	let B1path = new paper.Path()
 	B1path.add(B1)
@@ -525,10 +513,48 @@ function drawShapes(drawHelpers) {
 		child.strokeScaling = false
 	}
 
+	// Interpolate between reference shapes
+	group.scale(10)
+	interpolateBetweenReferenceShapes()
+	group.scale(0.1)
+
+	// Compute tangent dependent paths
+
+	let ElevenB = frontShape.getPointAt(sEleven.location.offset - 2.5)
+	let TwelveB = frontShape.getPointAt(sTwelve.location.offset + 3.5)
+	
+	let ElevenBPath = new paper.Path()
+	ElevenBPath.add(ElevenB)
+	ElevenBPath.add(TwelveB)
+	enlargementGroup.addChild(ElevenBPath)
+
+	let bPath = new paper.Path()
+	bPath.add(B1)
+	bPath.add(sF.point.x, B1.y)
+	enlargementGroup.addChild(bPath)
+
+	let bPathIntersections = bPath.getIntersections(backShape)
+	let minX = Number.MAX_VALUE
+	let K2 = null
+	for(let intersection of bPathIntersections) {
+		if(intersection.point.x < minX) {
+			minX = intersection.point.x
+			K2 = intersection.point
+		}
+	}
+
+	bPath.lastSegment.point.x = K2.x
+
+	let bPath2 = new paper.Path()
+	bPath2.add(new paper.Segment(K2.add(6, 0), null, new paper.Point(-4, 0) ))
+	bPath2.add(K2.x, K2.y + 1)
+	enlargementGroup.addChild(bPath2)
+
 	// Sleeve
 
 	let sleeveHelpers = new paper.Group()
-	group.addChild(sleeveHelpers)
+	sleeveHelpers.visible = drawHelpers
+	helperGroup.addChild(sleeveHelpers)
 
 	let frontSleeveLength = sTwelve.curve.length
 	let backSleeveLength = sK.curve.length
@@ -657,6 +683,7 @@ function drawShapes(drawHelpers) {
 		length = DToALength(sleeveTop, sleeveSA)
 		console.log(length)
 		if( n > 100) {
+			console.error('Unable to set proper sleeve length')
 			break
 		}
 		n++
@@ -673,7 +700,7 @@ function drawShapes(drawHelpers) {
 	length = EToALength(sleeveTop, sleeveSA)
 	n = 0
 	while ( EToAIsAboutFrontSleeveLength(length) ) {
-		if(length < frontSeeveLength) {
+		if(length < frontSleeveLength) {
 			sbSE.point.x += 0.1
 			stSE.point.x += 0.1
 		} else if (length >= frontSleeveLength + 1.2) {
@@ -683,6 +710,7 @@ function drawShapes(drawHelpers) {
 		length = DToALength(sleeveTop, sleeveSA)
 		console.log(length)
 		if( n > 100) {
+			console.error('Unable to set proper sleeve length')
 			break
 		}
 		n++
@@ -702,6 +730,10 @@ function drawShapes(drawHelpers) {
 	group.addChild(sleeveBottom)
 
 	group.scale(10)
+
+	for(let referenceShape of referenceShapes) {
+		referenceShape.shapes.position = shapes.position
+	}
 }
 
 function interpolateBetweenReferenceShapes() {
@@ -856,7 +888,7 @@ function initialize() {
 		parrot.visible = debugParameters.showParrot
 	}})
 
-	loadReferenceShapes()
+	loadReferenceShapesFromLocalStorage()
 }
 
 function draw() {
@@ -1003,7 +1035,7 @@ paper.view.onMouseDrag = (event)=>{
 
 		if(referenceShapeGroup.isAncestor(selectedShape)) {
 			interpolateBetweenReferenceShapes()
-			saveReferenceShapes()
+			saveReferenceShapesToLocalStorage()
 		}
 	}
 	if(parrot.data.dragging) {
@@ -1099,9 +1131,62 @@ folder.add(debugParameters, 'parrotScaleY', -1, 1).onChange((value)=>{
 	parrot.scaling.y = value
 });
 
+
 let createReferenceShapeButton = folder.add(debugParameters, 'createReferenceShape').name('Creer une référence');
-let setReferenceShapeButton = folder.add(debugParameters, 'setToReferenceShape').name('Régler aux valeurs d	e la référence');
+let setReferenceShapeButton = folder.add(debugParameters, 'setToReferenceShape').name('Régler aux valeurs de la référence');
 let deleteReferenceShapeButton = folder.add(debugParameters, 'deleteReferenceShape').name('Supprimer la référence');
+
+let createLoadReferencesButton = ()=> {
+
+	// Import SVG to add shapes
+	let divJ = $("<input data-name='file-selector' type='file' class='form-control' name='file[]'  accept='json'/>")
+
+	let importJSON = (event)=> {
+		referenceShapes = JSON.parse(event.target.result)
+		loadReferences()
+		referenceShapeGroup.removeChildren()
+		// save to local storage and display changes
+		saveReferenceShapesToLocalStorage()
+		loadReferenceShapesFromLocalStorage()
+		displayGeneratingAndDraw()
+	}
+
+	let handleFileSelect = (event) => {
+		let files = event.dataTransfer != null ? event.dataTransfer.files : event.target.files
+
+		for (let i = 0; i < files.length; i++) {
+			let file = files.item(i)
+			
+			let imageType = /^json\//
+
+			if (!imageType.test(file.type)) {
+				continue
+			}
+
+			let reader = new FileReader()
+			reader.onload = (event)=> importJSON(event)
+			reader.readAsText(file)
+		}
+	}
+
+	let loadReferencesButton = folder.add({ loadReferences: ()=> {
+		divJ.click()
+	} }, 'loadReferences').name('Charger les références...')
+
+	divJ.click((event)=>{
+		event.stopPropagation()
+		return -1;
+	})
+	$(loadReferencesButton.domElement).append(divJ)
+	divJ.hide()
+	divJ.change(handleFileSelect)
+
+}
+
+createLoadReferencesButton()
+
+folder.add(debugParameters, 'saveReferenceShapesToLocalStorage').name('Enregistrer les références...')
+			
 
 gui.add(tools, 'exportSVG');
 
