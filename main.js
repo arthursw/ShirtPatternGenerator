@@ -3,7 +3,7 @@ let parameters = {
 	waistSize: 84,
 	hipSize: 99,
 	collarSize: 44,
-	seventhCervical: 10.1,
+	backCollarSize: 10.1, // 7th cervical to collar point
 	shoulderLength: 15.7,
 	shoulderSpanBack: 39.5,
 	shoulderSpanFront: 37,
@@ -14,21 +14,17 @@ let parameters = {
 
 let tools = {
 	exportSVG: ()=> {
-		let visible = preview.visible;
-		preview.visible = false;
-		let parrot = paper.project.exportSVG( { asString: true });
+		let shirtPattern = paper.project.exportSVG( { asString: true });
 
-		// create an parrot image, create a link to download the image, and click it
-		let blob = new Blob([parrot], {type: 'image/parrot+xml'});
+		// create an image, create a link to download the image, and click it
+		let blob = new Blob([shirtPattern], {type: 'image/svg+xml'});
 		let url = URL.createObjectURL(blob);
 		let link = document.createElement("a");
 		document.body.appendChild(link);
-		link.download = 'indian.svg';
+		link.download = 'patron-chemise.svg';
 		link.href = url;
 		link.click();
 		document.body.removeChild(link);
-
-		preview.visible = visible;
 	}
 }
 let applyRecursively = (item, functionToApply)=> {
@@ -45,11 +41,11 @@ let saveReferenceShapesToLocalStorage = ()=> {
 	for(let referenceShape of referenceShapes) {
 		referenceShapesJSON.push({ shapes: referenceShape.shapes.exportJSON(), values: referenceShape.values })
 	}
-	localStorage.setItem('referenceShapes', JSON.stringify(referenceShapesJSON))
+	localStorage.setItem('referenceShapes', JSON.stringify(referenceShapesJSON, null, 2))
 }
 
-let loadReferenceShapesFromLocalStorage = ()=> {
-	let referenceShapesJSON = JSON.parse(localStorage.getItem('referenceShapes')) || []
+let loadReferenceShapes = (referenceShapesJSON)=> {
+	referenceShapeGroup.removeChildren()
 	referenceShapes = []
 	for(let referenceShapeJSON of referenceShapesJSON) {
 		let rs = paper.project.importJSON(referenceShapeJSON.shapes)
@@ -64,6 +60,11 @@ let loadReferenceShapesFromLocalStorage = ()=> {
 		referenceShapes.push({ shapes: rs, values: referenceShapeJSON.values })
 	}
 	referenceShapeGroup.visible = debugParameters.showReferences
+}
+
+let loadReferenceShapesFromLocalStorage = ()=> {
+	let referenceShapesJSON = JSON.parse(localStorage.getItem('referenceShapes')) || []
+	loadReferenceShapes(referenceShapesJSON)
 }
 
 let getCurrentShape = ()=> {
@@ -403,6 +404,7 @@ function drawShapes(drawHelpers) {
 		helperGroup.addChild(fourPath)
 	}
 
+
 	if(reselectShapes) {
 		selectedShape = shapes
 		for(let child of shapes.children) {
@@ -434,9 +436,10 @@ function drawShapes(drawHelpers) {
 	sixPath.add(sSix.point.add(-6, 0))
 	enlargementGroup.addChild(sixPath)
 
+	let overlap = 1.5
 	let v1 = new paper.Path()
-	v1.add(Eight.add(-1.5, 0))
-	v1.add(sOne.point.add(-1.5, 0))
+	v1.add(Eight.add(-overlap, 0))
+	v1.add(sOne.point.add(-overlap, 0))
 	enlargementGroup.addChild(v1)
 
 	let v2 = new paper.Path()
@@ -517,6 +520,22 @@ function drawShapes(drawHelpers) {
 	group.scale(10)
 	interpolateBetweenReferenceShapes()
 	group.scale(0.1)
+
+	let otherSide = new paper.Group()
+	for(let child of [frontShape, backShape, FiftenPath, F2path, v1, v2, v3, h1, h2]) {
+		let other = child.clone()
+		if(child == v3) {
+			other.firstSegment.point.x += 2
+			other.lastSegment.point.x += 2
+		} else if(child == h1 || child == h2) {
+			other.firstSegment.point.x += 2
+		}
+
+		otherSide.addChild(other)
+	}
+	otherSide.scaling.x = -1
+	otherSide.position.x += otherSide.bounds.width
+	group.addChild(otherSide)
 
 	// Compute tangent dependent paths
 
@@ -643,16 +662,16 @@ function drawShapes(drawHelpers) {
 	let sleeveD3 = sleeveD3Intersections[0].point
 	let sleeveD3Offset = sleeveD3path.getPointAt(sleeveD3path.getOffsetOf(sleeveD3) + 1.8)
 
-	let sleeveBottom = new paper.Path()
-	let sbSD = sleeveBottom.add(sleeveD)
-	sleeveBottom.add(sleeveF)
-	sleeveBottom.add(sleeveG)
-	let sbSE = sleeveBottom.add(sleeveE)
+	// let sleeveBottom = new paper.Path()
+	// let sbSD = sleeveBottom.add(sleeveD)
+	// sleeveBottom.add(sleeveF)
+	// sleeveBottom.add(sleeveG)
+	// let sbSE = sleeveBottom.add(sleeveE)
 	
 	let sleeveTop = new paper.Path()
 	let stSE = sleeveTop.add(sleeveE)
-	sleeveTop.add(sleeveE2Offset)
-	sleeveTop.add(sleeveE1Offset)
+	let stSE2 = sleeveTop.add(sleeveE2Offset)
+	let stSE1 = sleeveTop.add(sleeveE1Offset)
 	sleeveTop.add(sleeveE3Offset)
 	let sleeveSA = sleeveTop.add(sleeveA)
 	sleeveTop.add(sleeveD3Offset)
@@ -662,26 +681,34 @@ function drawShapes(drawHelpers) {
 	let stSD = sleeveTop.add(sleeveD)
 	sleeveTop.smooth()
 
-	let DToALength = (sleeveTop, sleeveSA)=> {
-		return sleeveTop.length - sleeveSA.location.offset
-	}
+	let sleeveBackTop = sleeveTop.splitAt(sleeveSA.location)
+	let sleeveFrontTop = sleeveTop
+
+	let sleeveBackBottom = new paper.Path()
+	sleeveBackBottom.add(sleeveD)
+	sleeveBackBottom.add(sleeveF)
+	sleeveBackBottom.add(sleeveC)
+
+	let sleeveFrontBottom = new paper.Path()
+	sleeveFrontBottom.add(sleeveE)
+	sleeveFrontBottom.add(sleeveG)
+	sleeveFrontBottom.add(sleeveC)
 
 	let DToAIsAboutBackSleeveLength = (length)=> {
 		return length >= backSleeveLength && length < backSleeveLength + 1.2
 	}
 
-	let length = DToALength(sleeveTop, sleeveSA)
+	let length = sleeveBackTop.length
 	let n = 0
-	while ( DToAIsAboutBackSleeveLength(length) ) {
+	while ( ! DToAIsAboutBackSleeveLength(length) ) {
 		if(length < backSleeveLength) {
-			sbSD.point.x += 0.1
-			stSD.point.x += 0.1
+			sleeveBackTop.bounds.width += 0.1
 		} else if (length >= backSleeveLength + 1.2) {
-			sbSD.point.x -= 0.1
-			stSD.point.x -= 0.1
+			sleeveBackTop.bounds.width -= 0.1
 		}
-		length = DToALength(sleeveTop, sleeveSA)
-		console.log(length)
+		sleeveBackTop.bounds.left = sleeveA.x
+		sleeveBackBottom.firstSegment.point.x = sleeveBackTop.bounds.right
+		length = sleeveBackTop.length
 		if( n > 100) {
 			console.error('Unable to set proper sleeve length')
 			break
@@ -689,26 +716,21 @@ function drawShapes(drawHelpers) {
 		n++
 	}
 
-	let EToALength = (sleeveTop, sleeveSA)=> {
-		return sleeveSA.location.offset
-	}
-
 	let EToAIsAboutFrontSleeveLength = (length)=> {
 		return length >= frontSleeveLength && length < frontSleeveLength + 1.2
 	}
 
-	length = EToALength(sleeveTop, sleeveSA)
+	length = sleeveFrontTop.length
 	n = 0
-	while ( EToAIsAboutFrontSleeveLength(length) ) {
+	while ( !EToAIsAboutFrontSleeveLength(length) ) {
 		if(length < frontSleeveLength) {
-			sbSE.point.x += 0.1
-			stSE.point.x += 0.1
+			sleeveFrontTop.bounds.width += 0.1
 		} else if (length >= frontSleeveLength + 1.2) {
-			sbSE.point.x -= 0.1
-			stSE.point.x -= 0.1
+			sleeveFrontTop.bounds.width -= 0.1
 		}
-		length = DToALength(sleeveTop, sleeveSA)
-		console.log(length)
+		sleeveFrontTop.bounds.right = sleeveA.x
+		sleeveFrontBottom.firstSegment.point.x = sleeveFrontTop.bounds.left
+		length = sleeveFrontTop.length
 		if( n > 100) {
 			console.error('Unable to set proper sleeve length')
 			break
@@ -721,13 +743,156 @@ function drawShapes(drawHelpers) {
 		child.strokeColor = 'green'
 	}
 	
-	for(let child of [sleeveTop, sleeveBottom]) {
+	let sleeve = new paper.Group()
+	group.addChild(sleeve)
+
+	for(let child of [sleeveFrontTop, sleeveFrontBottom, sleeveBackTop, sleeveBackBottom]) {
 		child.strokeWidth = 1
 		child.strokeColor = 'black'
+		sleeve.addChild(child)
 	}
 
-	group.addChild(sleeveTop)
-	group.addChild(sleeveBottom)
+	let sleeveDelta = sleeve.position.clone()
+	sleeve.position.x = sOne.point.x + sleeve.bounds.width / 2
+	sleeve.position.y = sOne.point.y + sleeve.bounds.height / 2 + 2
+	
+	sleeveDelta = sleeve.position.subtract(sleeveDelta)
+
+	sleeveHelpers.position = sleeveHelpers.position.add(sleeveDelta)
+
+	let otherSleeve = sleeve.clone()
+	otherSleeve.scaling.x = -1
+	otherSleeve.bounds.left = sleeve.bounds.right + 2
+
+	// Collar 
+
+	let collarA = ()=> {
+		let collarFooterHeight = 3.5
+		let collarSpacingY = 2
+		let collarFallHeight = 4.5
+
+		let frontCollarSize = parameters.collarSize / 2
+		let backCollarSize = parameters.backCollarSize
+
+		let collarTopLeft = new paper.Point(otherSleeve.bounds.right + 2, sleeve.bounds.top + 2)
+
+		let C = collarTopLeft.add(2, collarFallHeight + collarSpacingY + collarFooterHeight)
+		let BC = 0.5 * frontCollarSize + overlap
+		let B = C.add(BC, 0)
+		let B1 = B.add(0, -collarFooterHeight)
+		let A = B.add(backCollarSize, 0)
+		let D = A.add(0, -collarFooterHeight)
+		let J = D.add(0, -collarSpacingY)
+		let K = J.add(0, -collarFallHeight)
+		let F = C.add(0.5, -1.5)
+		let G = F.add(1.4, -1.4)
+		let H = G.add(1.9, -0.5)
+		let M = H.add(0, -0.2)
+		let L = J.add(-backCollarSize, 0)
+		let L1 = K.add(-backCollarSize, 0)
+		let N = new paper.Point(M.x, K.y)
+		let O = new paper.Point(C.x-0.5, K.y-0.5)
+
+		let collarTop = new paper.Path()
+		collarTop.add(O)
+		collarTop.add(new paper.Segment(L1, new paper.Point(-BC*0.66, 0), null))
+		collarTop.add(K)
+		collarTop.add(J)
+		collarTop.add(new paper.Segment(L, null, new paper.Point(-BC*0.25, 0)))
+		collarTop.add(M)
+
+		let collarBottom = new paper.Path()
+		collarBottom.add(A)
+		collarBottom.add(new paper.Segment(B, null, new paper.Point(-0.5 * BC, 0)))
+		collarBottom.add(F)
+		collarBottom.add(G)
+		collarBottom.add(new paper.Segment(H, null, new paper.Point(0.2 * BC, -1)))
+		collarBottom.add(new paper.Segment(B1, new paper.Point(-1, 0), null))
+		collarBottom.add(D)
+
+		let collarHpath = new paper.Path()
+		let offsetOfH = collarBottom.getOffsetOf(H)
+		collarHpath.add( collarBottom.getPointAt(offsetOfH - 0.1) )
+		collarHpath.add( H.add(0, 0.15) )
+		collarHpath.add( collarBottom.getPointAt(offsetOfH + 0.1) )
+
+		let collarBpath = new paper.Path()
+		let offsetOfB = collarBottom.getOffsetOf(B)
+		collarBpath.add( collarBottom.getPointAt(offsetOfB - 0.2) )
+		collarBpath.add( B.add(0, -0.2) )
+		collarBpath.add( collarBottom.getPointAt(offsetOfB + 0.2) )
+
+		for(let child of [collarTop, collarBottom, collarHpath, collarBpath]) {
+			child.strokeWidth = 1
+			child.strokeColor = 'black'
+			child.closed = true
+			group.addChild(child)
+
+			let childB = child.clone()
+			let distance = A.x - child.bounds.right
+
+			childB.scaling.x = -1
+
+			childB.bounds.left = A.x + distance
+		}
+	}
+
+	collarA()
+
+
+	let collarB = ()=> {
+		let collarFooterHeight = 3.5
+		let collarSpacingY = 2
+		let collarFallHeight = 4.5
+
+		let frontCollarSize = parameters.collarSize / 2
+		let backCollarSize = parameters.backCollarSize
+
+		let collarTopLeft = new paper.Point(otherSleeve.bounds.right + 2, sleeve.bounds.top + 2 + collarFallHeight + collarSpacingY + collarFooterHeight)
+
+		let C = collarTopLeft.add(4, 4 + collarFallHeight + collarFooterHeight)
+		let BC = 0.5 * frontCollarSize + overlap
+		let B = C.add(BC, 0)
+		// let L = B.add(0, - collarFooterHeight - collarFallHeight)
+		let A = B.add(backCollarSize, 0)
+		let D = A.add(0, - collarFooterHeight - collarFallHeight)
+		let F = C.add(-0.1, -2)
+		let H = F.add(2, -2)
+		let M = H.add(0, -0.2)
+		let O = new paper.Point(C.x-0.5, D.y-3)
+		let P = C.add(BC/2, 0.5)
+
+		let collar = new paper.Path()
+		collar.add(A)
+		collar.add(new paper.Segment(D, null, new paper.Point(-BC*0.66, 0)))
+		collar.add(O)
+		collar.add(new paper.Segment(H, null, new paper.Point(-1.5, 0)))
+		collar.add(new paper.Segment(F, new paper.Point(0, -1.5), null))
+		collar.add(new paper.Segment(P, new paper.Point(-2, 0), new paper.Point(2, 0)))
+		collar.add(new paper.Segment(B, new paper.Point(-2, 0), null))
+
+		let collarB = new paper.Path()
+		let offsetOfB = collar.getOffsetOf(B)
+		collarB.add( collar.getPointAt(offsetOfB - 0.2) )
+		collarB.add( B.add(0, -0.2) )
+		collarB.add( B )
+
+		for(let child of [collar, collarB]) {
+			child.strokeWidth = 1
+			child.strokeColor = 'black'
+			child.closed = true
+			group.addChild(child)
+
+			let childB = child.clone()
+			let distance = A.x - child.bounds.right
+
+			childB.scaling.x = -1
+
+			childB.bounds.left = A.x + distance
+		}
+	}
+
+	collarB()
 
 	group.scale(10)
 
@@ -914,7 +1079,7 @@ function draw() {
 
 	paper.view.zoom = 1
 
-	let viewRatio = paper.view.viewSize.width / paper.view.viewSize.height
+	let viewRatio = paper.view.bounds.width / paper.view.bounds.height
 	let shapeRatio = groupBounds.width / groupBounds.height
 
 	if(viewRatio > shapeRatio) {
@@ -1045,6 +1210,12 @@ paper.view.onMouseDrag = (event)=>{
 	}
 }
 
+paper.view.onResize = ()=> {
+	displayGeneratingAndDraw()
+}
+
+window.addEventListener("resize", displayGeneratingAndDraw);
+
 function displayGeneratingAndDraw() {
 	draw();
 }
@@ -1073,6 +1244,7 @@ document.addEventListener('drop', onDocumentDrop, false);
 document.addEventListener('dragover', onDocumentDrag, false);
 document.addEventListener('dragleave', onDocumentDrag, false);
 
+dat.GUI.DEFAULT_WIDTH = '100%';
 var gui = new dat.GUI({autoPlace: false});
 var customContainer = document.getElementById('gui');
 customContainer.appendChild(gui.domElement);
@@ -1081,7 +1253,7 @@ gui.add(parameters, 'bustSize', 84, 120).name('Tour de poitrine').onChange(displ
 gui.add(parameters, 'waistSize', 72, 108).name('Tour de taille').onChange(displayGeneratingAndDraw);
 gui.add(parameters, 'hipSize', 89, 117).name('Tour de bassin').onChange(displayGeneratingAndDraw);
 gui.add(parameters, 'collarSize', 41.9, 48.2).name('Tour bas encolure').onChange(displayGeneratingAndDraw);
-gui.add(parameters, 'seventhCervical', 9.5, 11.3).name('Long. 7em cerv. encolure').onChange(displayGeneratingAndDraw);
+gui.add(parameters, 'backCollarSize', 9.5, 11.3).name('Long. 7em cerv. encolure').onChange(displayGeneratingAndDraw);
 gui.add(parameters, 'shoulderLength', 14.7, 16.4).name('Long. d\'épaule').onChange(displayGeneratingAndDraw);
 gui.add(parameters, 'shoulderSpanBack', 36.2, 46).name('Carrure dos').onChange(displayGeneratingAndDraw);
 gui.add(parameters, 'shoulderSpanFront', 33.7, 43.5).name('Carrure devant').onChange(displayGeneratingAndDraw);
@@ -1089,7 +1261,7 @@ gui.add(parameters, 'backLength', 43, 47.8).name('Long. taille dos').onChange(di
 gui.add(parameters, 'armLength', 60, 64).name('Long. bras').onChange(displayGeneratingAndDraw);
 
 
-let folder = gui.addFolder('Debug')
+let folder = gui.addFolder('Admin.')
 
 // folder.add(debugParameters, 'BpX', 0, 10).onChange(displayGeneratingAndDraw);
 // folder.add(debugParameters, 'Bout', 0, 10).onChange(displayGeneratingAndDraw);
@@ -1106,30 +1278,30 @@ let folder = gui.addFolder('Debug')
 // folder.add(debugParameters, 'GpY', 0, 1).onChange(displayGeneratingAndDraw);
 // folder.add(debugParameters, 'GpTension', 0, 1).onChange(displayGeneratingAndDraw);
 
-folder.add(debugParameters, 'separationBetweenFrontAndBack', 0, 20).name('Separation').onChange(displayGeneratingAndDraw);
+folder.add(debugParameters, 'separationBetweenFrontAndBack', 0, 20).name('Séparation').onChange(displayGeneratingAndDraw);
 
 folder.add(debugParameters, 'showParrot').onChange((value)=>{
 	parrot.visible = value
-});
+}).name('Voir perroquet');
 folder.add(debugParameters, 'showHelpers').onChange((value)=>{
 	displayGeneratingAndDraw()
-});
+}).name('Tracers d\'aides');
 folder.add(debugParameters, 'showReferences').onChange((value)=>{
 	referenceShapeGroup.visible = value
 	displayGeneratingAndDraw()
-});
+}).name('Voir références');
 folder.add(debugParameters, 'showPattern').onChange((value)=>{
 	displayGeneratingAndDraw()
-});
+}).name('Voir patron');
 folder.add(debugParameters, 'parrotRotation', 0, 360).onChange((value)=>{
 	parrot.rotation = value
-});
+}).name('Rot. perroquet');
 folder.add(debugParameters, 'parrotScaleX', -1, 1).onChange((value)=>{
 	parrot.scaling.x = value
-});
+}).name('Taille X perroquet');
 folder.add(debugParameters, 'parrotScaleY', -1, 1).onChange((value)=>{
 	parrot.scaling.y = value
-});
+}).name('Taille Y perroquet');
 
 
 let createReferenceShapeButton = folder.add(debugParameters, 'createReferenceShape').name('Creer une référence');
@@ -1143,11 +1315,11 @@ let createLoadReferencesButton = ()=> {
 
 	let importJSON = (event)=> {
 		referenceShapes = JSON.parse(event.target.result)
-		loadReferences()
-		referenceShapeGroup.removeChildren()
+		loadReferenceShapes(referenceShapes)
+		// referenceShapeGroup.removeChildren()
 		// save to local storage and display changes
 		saveReferenceShapesToLocalStorage()
-		loadReferenceShapesFromLocalStorage()
+		// loadReferenceShapesFromLocalStorage()
 		displayGeneratingAndDraw()
 	}
 
@@ -1157,7 +1329,7 @@ let createLoadReferencesButton = ()=> {
 		for (let i = 0; i < files.length; i++) {
 			let file = files.item(i)
 			
-			let imageType = /^json\//
+			let imageType = /^application\/json/
 
 			if (!imageType.test(file.type)) {
 				continue
@@ -1178,9 +1350,10 @@ let createLoadReferencesButton = ()=> {
 		return -1;
 	})
 	$(loadReferencesButton.domElement).append(divJ)
-	divJ.hide()
-	divJ.change(handleFileSelect)
+	
 
+	divJ.on('change', handleFileSelect)
+	divJ.hide()
 }
 
 createLoadReferencesButton()
@@ -1188,7 +1361,7 @@ createLoadReferencesButton()
 folder.add(debugParameters, 'saveReferenceShapesToLocalStorage').name('Enregistrer les références...')
 			
 
-gui.add(tools, 'exportSVG');
+gui.add(tools, 'exportSVG').name('Exporter en SVG');
 
 initialize();
 displayGeneratingAndDraw();
