@@ -2,4 +2,4 @@
 
 A [shirt pattern generator](https://arthursw.github.io/ShirtPatternGenerator/).
 
-License: MIT
+License: Apache License 2.0
